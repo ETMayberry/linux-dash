@@ -2,7 +2,7 @@ angular
   .module('linuxDash')
   .service('server', [
     '$http', '$rootScope', '$location',
-    function($http, $rootScope, $location) {
+    function ($http, $rootScope, $location) {
 
       var websocket = {
         connection: null,
@@ -15,7 +15,7 @@ angular
        *
        * @return Null
        */
-      var establishWebsocketConnection = function() {
+      var establishWebsocketConnection = function () {
 
         var websocketUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.hostname + ':' + window.location.port;
 
@@ -23,27 +23,37 @@ angular
 
           websocket.connection = new WebSocket(websocketUrl);
 
-          websocket.connection.onopen = function() {
+          websocket.connection.onopen = function () {
             $rootScope.$broadcast("start-linux-dash", {});
             $rootScope.$apply();
             console.info('Websocket connection is open');
           };
 
-          websocket.connection.onmessage = function(event) {
+          websocket.connection.onmessage = function (event) {
+            try {
+              var response = JSON.parse(event.data);
+              var moduleName = response.moduleName;
+              
+              var moduleData;
+              if (typeof response.output === 'object') {
+                moduleData = JSON.parse(response.output);
+              } else {
+                moduleData = response.output;
+              }
 
-            var response = JSON.parse(event.data);
-            var moduleName = response.moduleName;
-            var moduleData = JSON.parse(response.output);
+              if (!!websocket.onMessageEventHandlers[moduleName]) {
+                websocket.onMessageEventHandlers[moduleName](moduleData);
+              } else {
+                console.info("Websocket could not find module", moduleName, "in:", websocket.onMessageEventHandlers);
+              }
 
-            if (!!websocket.onMessageEventHandlers[moduleName]) {
-              websocket.onMessageEventHandlers[moduleName](moduleData);
-            } else {
-              console.info("Websocket could not find module", moduleName, "in:", websocket.onMessageEventHandlers);
+            } catch (err) {
+              console.error(err);
             }
 
           };
 
-          websocket.connection.onclose = function() {
+          websocket.connection.onclose = function () {
             websocket.connection = null;
           }
         }
@@ -57,7 +67,7 @@ angular
        *
        * @return Null
        */
-      this.checkIfWebsocketsAreSupported = function() {
+      this.checkIfWebsocketsAreSupported = function () {
 
         var websocketSupport = {
           browser: null,
@@ -70,7 +80,7 @@ angular
           websocketSupport.browser = true;
 
           // does backend support websockets?
-          $http.get("/websocket").then(function(response) {
+          $http.get("/websocket").then(function (response) {
 
             // if websocket_support property exists and is trurthy
             // websocketSupport.server will equal true.
@@ -104,7 +114,7 @@ angular
        * @param  {Function} callback
        * @return {[ Null || callback(server response) ]}
        */
-      this.get = function(moduleName, callback) {
+      this.get = function (moduleName, callback) {
 
         // if we have a websocket connection
         if (websocket.connection) {
@@ -132,7 +142,7 @@ angular
 
           var moduleAddress = 'server/?module=' + moduleName;
 
-          return $http.get(moduleAddress).then(function(response) {
+          return $http.get(moduleAddress).then(function (response) {
             return callback(response.data);
           });
 
@@ -141,4 +151,4 @@ angular
       };
 
     }
-])
+  ])
